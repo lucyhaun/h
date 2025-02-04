@@ -1,4 +1,4 @@
-let words = [{word: "hello!", quantity: 1}];
+let words = JSON.parse(localStorage.getItem("wordCloudData")) || [{ word: "The world", quantity: 1 }];
 
 let colors = ["#ffc300", "#00B050"];
 
@@ -11,29 +11,29 @@ const svg = d3
     .attr("width", width)
     .attr("height", height);
 
-const layout = d3.layout
+const layout = d3.layout // codes for how words are positioned in cloud
     .cloud()
     .size([width, height])
     .words(
         words.map((word) => ({
             text: word.word,
-            size: word.quantity * 20,
+            size: word.quantity * 20, //size based on quantity
         }))
     )
-    .padding(10)
-    .rotate(0)
-    .fontSize((d) => d.size)
-    .spiral("rectangular")
-    .on("end", draw);
+    .padding(10) //space between words
+    .rotate(0) //no rotation of words
+    .fontSize((d) => d.size) //sets font size based on word quantity
+    .spiral("rectangular") //words placed in regular pattern
+    .on("end", draw); //calls draw function when layout is complete
 
 layout.start();
 
 function draw(words) {
-    svg.selectAll("*").remove();
+    svg.selectAll("*").remove(); //clears previous words
 
     svg
     .append("g")
-    .attr("transform", `translate(${width / 2}, ${height / 2})`)
+    .attr("transform", `translate(${width / 2}, ${height / 2})`) //centers words
     .selectAll("text")
     .data(words)
     .enter()
@@ -49,13 +49,14 @@ function addWord() {
     const word = input.value;
     input.value = "";
 
-    const index = words.findIndex((w) => w.word === word);
-    if (index === -1) {
-        words.push({ word, quantity: 1 });
+    const index = words.findIndex((w) => w.word === word); //checks if word already exists in array
+    if (index === -1) { //if not found
+        words.push({ word, quantity: 1 }); //added with quantity 1
     } else {
-        words[index].quantity += 1;
+        words[index].quantity -= 1; //if found quantity is incremented other way
     }
 
+    localStorage.setItem("wordCloudData", JSON.stringify(words)); // Save to localStorage
     updateCloud();
 }
 
@@ -68,7 +69,14 @@ function updateCloud() {
              }))
         );
 
-        layout.start();
+        localStorage.setItem("wordCloudData", JSON.stringify(words)); // Save updated data
+    layout.start();
+}
+
+function clearCloud() {
+    words = [{ word: "The world", quantity: 1 }];
+    localStorage.removeItem("wordCloudData"); // Remove from storage
+    updateCloud();
 }
 
 console.log(words);

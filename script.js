@@ -1,4 +1,25 @@
-let words = JSON.parse(localStorage.getItem("wordCloudData")) || [{ word: "The world", quantity: 1 }];
+const firebaseConfig = {
+    apiKey: "AIzaSyD5kZRmmEcyJy8mO4nvsZXX2j41RDs74Vo",
+    authDomain: "cloud-9c0b7.firebaseapp.com",
+    projectId: "cloud-9c0b7",
+    storageBucket: "cloud-9c0b7.firebasestorage.app",
+    messagingSenderId: "323590350527",
+    appId: "1:323590350527:web:dc6aa9fdba08d46efa480a",
+    measurementId: "G-RD29PBYJG0"
+  };
+
+firebase.initialiseApp(firebaseConfig);
+const db = firebase.firestore();
+
+async function loadWords() {
+    const snapshot = await db.collection("words").get();
+    words = snapshot.docs.map(doc => doc.data());
+
+    updateCloud();
+}
+
+// Load words when the page loads
+loadWords();
 
 let colors = ["#ffc300", "#00B050"];
 
@@ -44,38 +65,41 @@ function draw(words) {
     .text((d) => d.text);
 }
  
-function addWord() {
+async function addWord() {
     const input = document.querySelector("#word-input");
-    const word = input.value;
+    const word = input.value.trim();
     input.value = "";
+    if (word === "") return;
 
-    const index = words.findIndex((w) => w.word === word); //checks if word already exists in array
-    if (index === -1) { //if not found
-        words.push({ word, quantity: 1 }); //added with quantity 1
+    const wordRef = db.collection("words").doc(word);
+    const doc = await wordRef.get();
+
+    if (doc.exists) {
+        await wordRef.update({ quantity: doc.data().quantity + 1 });
     } else {
-        words[index].quantity -= 1; //if found quantity is incremented other way
+        await wordRef.set({ word, quantity: 1 });
     }
 
-    localStorage.setItem("wordCloudData", JSON.stringify(words)); // Save to localStorage
-    updateCloud();
+    loadWords(); // Reload the cloud
 }
 
 function updateCloud() {
-        const maxSize = 100;
-        layout.words(
-            words.map((w) => ({
-                text: w.word,
-                size: Math.min(w.quantity * 20, maxSize),
-             }))
-        );
+    const maxSize = 100;
+    layout.words(
+        words.map(w => ({
+            text: w.word,
+            size: Math.min(w.quantity * 20, maxSize),
+        }))
+    );
 
-        localStorage.setItem("wordCloudData", JSON.stringify(words)); // Save updated data
     layout.start();
 }
 
-function clearCloud() {
-    words = [{ word: "The world", quantity: 1 }];
-    localStorage.removeItem("wordCloudData"); // Remove from storage
+async function clearCloud() {
+    const snapshot = await db.collection("words").get();
+    snapshot.forEach(doc => doc.ref.delete());
+
+    words = [];
     updateCloud();
 }
 

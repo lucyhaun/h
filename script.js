@@ -1,109 +1,82 @@
-import { initializeApp } from "https://www.gstatic.com/firebasejs/11.3.0/firebase-app.js";
-import { getFirestore, collection, getDocs, doc, getDoc, setDoc, updateDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/11.3.0/firebase-firestore.js";
+let words = JSON.parse(localStorage.getItem("wordCloudData")) || [{ word: "Questions", quantity: 1 }];
 
-// Firebase configuration and initialization
-const firebaseConfig = {
-    apiKey: "AIzaSyD5kZRmmEcyJy8mO4nvsZXX2j41RDs74Vo",
-    authDomain: "cloud-9c0b7.firebaseapp.com",
-    projectId: "cloud-9c0b7",
-    storageBucket: "cloud-9c0b7.firebasestorage.app",
-    messagingSenderId: "323590350527",
-    appId: "1:323590350527:web:dc6aa9fdba08d46efa480a",
-    measurementId: "G-RD29PBYJG0"
-};
-
-const app = initializeApp(firebaseConfig);
-const db = getFirestore(app);
-
-// Initialize words array and other variables
-let words = [];
 let colors = ["#ffc300", "#00B050"];
+
 const width = 800;
 const height = 400;
 
-// Function to load words from Firestore
-async function loadWords() {
-    const querySnapshot = await getDocs(collection(db, "words"));
-    words = querySnapshot.docs.map(doc => doc.data());
-    updateCloud(); // Update the word cloud once data is fetched
-}
-
-// Load words when the page loads
-loadWords();
-
-// D3 setup for the word cloud
 const svg = d3
     .select("section")
     .append("svg")
     .attr("width", width)
     .attr("height", height);
 
-const layout = d3.layout.cloud()
+const layout = d3.layout // codes for how words are positioned in cloud
+    .cloud()
     .size([width, height])
-    .words([])
-    .padding(10)
-    .rotate(0)
-    .fontSize(d => d.size)
-    .spiral("rectangular")
-    .on("end", draw);
+    .words(
+        words.map((word) => ({
+            text: word.word,
+            size: word.quantity * 20, //size based on quantity
+        }))
+    )
+    .padding(10) //space between words
+    .rotate(0) //no rotation of words
+    .fontSize((d) => d.size) //sets font size based on word quantity
+    .spiral("rectangular") //words placed in regular pattern
+    .on("end", draw); //calls draw function when layout is complete
+
+layout.start();
 
 function draw(words) {
-    svg.selectAll("*").remove(); // Clears previous words
-    svg.append("g")
-        .attr("transform", `translate(${width / 2}, ${height / 2})`) // Centers words
-        .selectAll("text")
-        .data(words)
-        .enter()
-        .append("text")
-        .style("font-size", d => d.size + "px")
-        .attr("text-anchor", "middle")
-        .attr("transform", d => `translate(${[d.x, d.y]})rotate(${d.rotate})`)
-        .text(d => d.text);
+    svg.selectAll("*").remove(); //clears previous words
+
+    svg
+    .append("g")
+    .attr("transform", `translate(${width / 2}, ${height / 2})`) //centers words
+    .selectAll("text")
+    .data(words)
+    .enter()
+    .append("text")
+    .style("font-size", (d) => d.size + "px")
+    .attr("text-anchor", "middle")
+    .attr("transform", (d) => `translate(${[d.x, d.y]})rotate(${d.rotate})`)
+    .text((d) => d.text);
 }
-
-// Function to add a new word to Firestore
-async function addWord() {
+ 
+function addWord() {
     const input = document.querySelector("#word-input");
-    const word = input.value.trim();
+    const word = input.value;
     input.value = "";
-    if (word === "") return;
 
-    const wordRef = doc(db, "words", word);
-    const docSnap = await getDoc(wordRef); // Use getDoc for single document retrieval
-
-    if (docSnap.exists()) {
-        // If the word already exists, update the quantity
-        await updateDoc(wordRef, { quantity: docSnap.data().quantity + 1 });
+    const index = words.findIndex((w) => w.word === word); //checks if word already exists in array
+    if (index === -1) { //if not found
+        words.push({ word, quantity: 1 }); //added with quantity 1
     } else {
-        // If the word doesn't exist, create it with quantity 1
-        await setDoc(wordRef, { word, quantity: 1 });
+        words[index].quantity -= 1; //if found quantity is incremented other way
     }
 
-    loadWords(); // Reload words and update cloud
+    localStorage.setItem("wordCloudData", JSON.stringify(words)); // Save to localStorage
+    updateCloud();
 }
 
-// Function to update the word cloud layout with the current words
 function updateCloud() {
-    const maxSize = 100;
-    layout.words(
-        words.map(w => ({
-            text: w.word,
-            size: Math.min(w.quantity * 20, maxSize),
-        }))
-    );
+        const maxSize = 100;
+        layout.words(
+            words.map((w) => ({
+                text: w.word,
+                size: Math.min(w.quantity * 20, maxSize),
+             }))
+        );
 
+        localStorage.setItem("wordCloudData", JSON.stringify(words)); // Save updated data
     layout.start();
 }
 
-// Function to clear the word cloud (delete all words from Firestore)
-async function clearCloud() {
-    const querySnapshot = await getDocs(collection(db, "words"));
-    for (const doc of querySnapshot.docs) {
-        await deleteDoc(doc.ref); // Delete each document from Firestore
-    }
-
-    words = []; // Reset words array
-    updateCloud(); // Update the cloud with no words
+function clearCloud() {
+    words = [{ word: "Questions", quantity: 1 }];
+    localStorage.removeItem("wordCloudData"); // Remove from storage
+    updateCloud();
 }
 
-console.log(words); // Debugging line to check the current words array
+console.log(words);
